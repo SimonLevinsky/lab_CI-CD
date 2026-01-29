@@ -1,0 +1,68 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Create Kind cluster
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: test-cluster
+        wait: 30s
+    
+    - name: Verify cluster
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+    
+    - name: Build Docker image
+      run: |
+        docker build -t my-fastapi-app:latest .
+    
+    - name: Load image into Kind cluster (Secret Sauce!)
+      run: |
+        kind load docker-image my-fastapi-app:latest --name test-cluster
+    
+    - name: Verify image is loaded
+      run: |
+        docker exec test-cluster-control-plane crictl images | grep my-fastapi-app
+    
+    - name: Install Helm chart
+      run: |
+        helm install my-app ./my-app --wait --timeout 2m
+    
+    - name: Wait for pods to be ready
+      run: |
+        kubectl wait --for=condition=ready pod --all --timeout=120s
+    
+    - name: Validate deployment
+      run: |
+        echo "=== All Pods ==="
+        kubectl get pods
+        echo ""
+        echo "=== All Services ==="
+        kubectl get svc
+        echo ""
+        echo "=== Pod Details ==="
+        kubectl describe pods
+    
+    - name: Test health endpoint
+      run: |
+        # Get the pod name
+        POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=my-app -o jsonpath='{.items[0].metadata.name}')
+        # Port forward in background
+        kubectl port-forward $POD_NAME 8000:8000 &
+        sleep 5
+        # Test the health endpoint
+        curl http://localhost:8000/health || echo "Health check failed"
