@@ -62,14 +62,29 @@ jobs:
         echo "Applying integration test job..."
         kubectl apply -f test-job.yaml
         
-        echo "Waiting for job to complete..."
-        kubectl wait --for=condition=complete job/integration-test --timeout=60s
+        echo "Waiting for job to start..."
+        sleep 5
         
         echo "=== Job Status ==="
         kubectl get job integration-test
         
-        echo "=== Job Logs ==="
-        kubectl logs job/integration-test
+        echo "=== Pod Status ==="
+        kubectl get pods -l job-name=integration-test
+        
+        echo "=== Job Logs (if available) ==="
+        kubectl logs -l job-name=integration-test --tail=50 || echo "No logs yet"
+        
+        echo "Waiting for job to complete..."
+        kubectl wait --for=condition=complete job/integration-test --timeout=120s || {
+          echo "Job failed to complete. Debugging info:"
+          kubectl describe job integration-test
+          kubectl get pods -l job-name=integration-test
+          kubectl logs -l job-name=integration-test --tail=100 || echo "No logs available"
+          exit 1
+        }
+        
+        echo "=== Final Job Logs ==="
+        kubectl logs -l job-name=integration-test
     
     - name: Cleanup on failure
       if: failure()
