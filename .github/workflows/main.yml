@@ -30,7 +30,7 @@ jobs:
       run: |
         docker build -t my-fastapi-app:latest .
     
-    - name: Load image into Kind cluster (Secret Sauce!)
+    - name: Load image into Kind cluster
       run: |
         kind load docker-image my-fastapi-app:latest --name test-cluster
     
@@ -41,33 +41,22 @@ jobs:
     - name: Install Helm chart
       run: |
         helm install my-app ./my-app --wait --timeout 2m
-
-    - name: Show service names
+    
+    - name: Debug - Show all services
       run: |
         echo "=== All Services ==="
-        kubectl get svc
+        kubectl get svc -o wide
         echo ""
-        echo "=== Full service name for testing ==="
-        kubectl get svc -l app.kubernetes.io/name=my-app -o jsonpath='{.items[0].metadata.name}'
+        echo "=== Service names only ==="
+        kubectl get svc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+        echo ""
+        echo "=== App service specifically ==="
+        kubectl get svc -l app.kubernetes.io/name=my-app -o yaml || echo "No service found with app.kubernetes.io/name=my-app label"
     
     - name: Wait for pods to be ready
       run: |
         kubectl wait --for=condition=ready pod --all --timeout=120s
     
-    - name: Debug services
-      run: |
-        echo "=== All Services ==="
-        kubectl get svc
-        echo ""
-        echo "=== Service Details ==="
-        kubectl get svc -o wide
-        echo ""
-        echo "=== Service Name==="
-        kubectl get svc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
-        echo ""
-        echo "=== Testing DNS from a pod ==="
-        kubectl run dns-test --image=curlimages/curl --restart=Never --rm -i --command -- sh -c "nslookup my-app.default.svc.cluster.local || nslookup my-app.default.svc.cluster.local || echo 'Both DNS lookups failed'"
-
     - name: Validate deployment
       run: |
         echo "=== All Pods ==="
@@ -75,9 +64,6 @@ jobs:
         echo ""
         echo "=== All Services ==="
         kubectl get svc
-        echo ""
-        echo "=== Service Names ==="
-        kubectl get svc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
         echo ""
         echo "=== Deployment Logs ==="
         kubectl logs -l app.kubernetes.io/name=my-app --tail=50

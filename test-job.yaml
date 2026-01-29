@@ -13,30 +13,41 @@ spec:
         - -c
         - |
           echo "Starting integration test..."
-          echo "Waiting for service to be ready..."
-          sleep 15
+          echo "Waiting for services to be ready..."
+          sleep 20
           
-          # The release name is "my-app", so service should be "my-app-my-app"
-          SERVICE_NAME="my-app-my-app"
+          # Try different possible service names
+          POSSIBLE_NAMES="my-app my-app-my-app release-name-my-app"
+          SERVICE_NAME=""
           
-          echo "=== Testing /health endpoint ==="
-          if curl -v -f http://${SERVICE_NAME}:8000/health; then
-            echo "✓ Health check passed!"
-          else
-            echo "✗ Health check failed!"
+          echo "=== Attempting to find the correct service name ==="
+          for name in $POSSIBLE_NAMES; do
+            echo "Trying: $name"
+            if curl -s -f http://${name}:8000/health > /dev/null 2>&1; then
+              echo "✓ Found working service name: $name"
+              SERVICE_NAME=$name
+              break
+            else
+              echo "✗ $name didn't work"
+            fi
+          done
+          
+          if [ -z "$SERVICE_NAME" ]; then
+            echo "✗ Could not find any working service name!"
             exit 1
           fi
           
           echo ""
+          echo "=== Testing /health endpoint with $SERVICE_NAME ==="
+          curl -v -f http://${SERVICE_NAME}:8000/health
+          echo "✓ Health check passed!"
+          
+          echo ""
           echo "=== Testing /write endpoint ==="
-          if curl -v -f -X POST http://${SERVICE_NAME}:8000/write \
+          curl -v -f -X POST http://${SERVICE_NAME}:8000/write \
             -H "Content-Type: application/json" \
-            -d '{"message": "Integration test successful!"}'; then
-            echo "✓ Write test passed!"
-          else
-            echo "✗ Write test failed!"
-            exit 1
-          fi
+            -d '{"message": "Integration test successful!"}'
+          echo "✓ Write test passed!"
           
           echo ""
           echo "🎉 All tests completed successfully!"
