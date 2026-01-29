@@ -41,6 +41,14 @@ jobs:
     - name: Install Helm chart
       run: |
         helm install my-app ./my-app --wait --timeout 2m
+
+    - name: Show service names
+      run: |
+        echo "=== All Services ==="
+        kubectl get svc
+        echo ""
+        echo "=== Full service name for testing ==="
+        kubectl get svc -l app.kubernetes.io/name=my-app -o jsonpath='{.items[0].metadata.name}'
     
     - name: Wait for pods to be ready
       run: |
