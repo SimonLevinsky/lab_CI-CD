@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: integration-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: curl
+        image: curlimages/curl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for service to be ready..."
+          sleep 10
+          echo "Testing /health endpoint..."
+          curl -f http://release-name-my-app:8000/health || exit 1
+          echo "Health check passed!"
+          echo "Testing /write endpoint..."
+          curl -f -X POST http://release-name-my-app:8000/write \
+            -H "Content-Type: application/json" \
+            -d '{"message": "Integration test successful!"}' || exit 1
+          echo "Write test passed!"
+          echo "All tests completed successfully!"
+      restartPolicy: Never
+  backoffLimit: 3

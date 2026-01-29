@@ -54,15 +54,34 @@ jobs:
         echo "=== All Services ==="
         kubectl get svc
         echo ""
-        echo "=== Pod Details ==="
-        kubectl describe pods
+        echo "=== Deployment Logs ==="
+        kubectl logs -l app.kubernetes.io/name=my-app --tail=50
     
-    - name: Test health endpoint
+    - name: Run integration test
       run: |
-        # Get the pod name
-        POD_NAME=$(kubectl get pods -l app.kubernetes.io/name=my-app -o jsonpath='{.items[0].metadata.name}')
-        # Port forward in background
-        kubectl port-forward $POD_NAME 8000:8000 &
-        sleep 5
-        # Test the health endpoint
-        curl http://localhost:8000/health || echo "Health check failed"
+        echo "Applying integration test job..."
+        kubectl apply -f test-job.yaml
+        
+        echo "Waiting for job to complete..."
+        kubectl wait --for=condition=complete job/integration-test --timeout=60s
+        
+        echo "=== Job Status ==="
+        kubectl get job integration-test
+        
+        echo "=== Job Logs ==="
+        kubectl logs job/integration-test
+    
+    - name: Cleanup on failure
+      if: failure()
+      run: |
+        echo "=== Pod Status ==="
+        kubectl get pods
+        echo ""
+        echo "=== App Logs ==="
+        kubectl logs -l app.kubernetes.io/name=my-app --tail=100
+        echo ""
+        echo "=== Postgres Logs ==="
+        kubectl logs -l app=postgres --tail=100
+        echo ""
+        echo "=== Events ==="
+        kubectl get events --sort-by='.lastTimestamp'
