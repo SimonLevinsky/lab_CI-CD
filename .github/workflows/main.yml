@@ -65,8 +65,11 @@ jobs:
         echo "=== All Services ==="
         kubectl get svc
         echo ""
-        echo "=== Deployment Logs ==="
-        kubectl logs -l app.kubernetes.io/name=my-app --tail=50
+        echo "=== FastAPI Application Logs ==="
+        kubectl logs -l app.kubernetes.io/name=my-app --tail=100
+        echo ""
+        echo "=== PostgreSQL Logs ==="
+        kubectl logs -l app=postgres --tail=100
     
     - name: Run integration test
       run: |
